@@ -10,11 +10,31 @@
 #include "uart.h"
 #include "spi.h"
 
-#include "xc.h"
-#include "string.h"
+#include <xc.h>
+#include <string.h>
+#include <math.h>
 
 #define CLOCK_LD_TOGGLE 50
 #define CLOCK_ACQUIRE_MAG 4
+
+#define N_MAG_READINGS 5
+
+struct MagReading {
+    int x;
+    int y;
+    int z;
+};
+
+struct MagReadings {
+    int w;
+    struct MagReading readings[N_MAG_READINGS];
+};
+
+enum Axis {
+    X_AXIS = 0,
+    Y_AXIS,
+    Z_AXIS,
+};
 
 void algorithm() {
     tmr_wait_ms(TIMER2, 7);
@@ -40,23 +60,25 @@ void activate_magnetometer() {
     tmr_wait_ms(TIMER1, 3); //waiting for the magnetometer to go into active state
 }
 
-int read_mag_x_axis() {
+int read_mag_axis(enum Axis axis) {
     //TODO: decide what to do with this overflow
     if(SPI1STATbits.SPIROV){
         SPI1STATbits.SPIROV = 0;
     }
     
     CS_MAG = 0;
-    spi_write(0x42 | 0x80);
-    const int mag_x_axis = (spi_write(0x00) & 0x00F8) | (spi_write(0x00) << 8);
+    spi_write((0x42 + axis * 2)| 0x80);
+    const int axis_value = (spi_write(0x00) & 0x00F8) | (spi_write(0x00) << 8);
     CS_MAG = 1;
 
-    return mag_x_axis >> 3;
+    return axis_value >> 3;
 }
 
 int main(void) {
     init_uart();
     init_spi(); //TODO: choose the right values for the SPI CLOCK
+
+    struct MagReadings mag_readings = {0};
 
     char input_buff[INPUT_BUFF_LEN];
     char output_buff[OUTPUT_BUFF_LEN];
@@ -84,15 +106,41 @@ int main(void) {
 
         if (++acquire_mag_counter >= CLOCK_LD_TOGGLE) {
             acquire_mag_counter = 0;
-            const int x_axis = read_mag_x_axis();
 
-            sprintf(output_str, "$MAG,%d,y,z*", x_axis);
+            // TODO: do some readings at the start to ensure that 
+            // the average is decent
+            mag_readings.readings[mag_readings.w] = (struct MagReading) {
+                .x = read_mag_axis(X_AXIS),
+                .y = read_mag_axis(Y_AXIS),
+                .z = read_mag_axis(Z_AXIS),
+            };
+
+            mag_readings.w = (mag_readings.w + 1) % N_MAG_READINGS;
+
+            //TODO: ensure that no overflow can occur
+            struct MagReading sum_reading = {0}; 
+            for(int i = mag_readings.w ; i != (mag_readings.w + 1) % N_MAG_READINGS; i = (i + 1) % N_MAG_READINGS) {
+                sum_reading.x += mag_readings.readings[i].x;
+                sum_reading.y += mag_readings.readings[i].y;
+                sum_reading.z += mag_readings.readings[i].z;
+            }
+
+            const struct MagReading avg_reading = {
+                .x = sum_reading.x / N_MAG_READINGS,
+                .y = sum_reading.y / N_MAG_READINGS,
+                .z = sum_reading.z / N_MAG_READINGS,
+            };
+
+            //TODO: print only at specified Hz
+            sprintf(output_str, "$MAG,%d,%d,%d*", avg_reading.x, avg_reading.y, avg_reading.z);
+            print_to_buff(output_str);
+
+            const int yaw_deg = (int) (180.0 * atan2((float)avg_reading.y, (float)avg_reading.x) / M_PI);
+            sprintf(output_str, "$YAW,%d*", yaw_deg); 
             print_to_buff(output_str);
         }
-
         tmr_wait_period(TIMER1);
     }
-       
     return 0;
 }
 
