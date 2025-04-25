@@ -9,6 +9,7 @@
 #include "timer.h"
 #include "uart.h"
 #include "spi.h"
+#include "parser.h"
 
 #include <xc.h>
 #include <string.h>
@@ -96,9 +97,10 @@ int main(void) {
 
     tmr_setup_period(TIMER1, 10);
 
+    parser_state pstate = {.state = STATE_DOLLAR };
+
     while (1) {
         algorithm();
- 
         if (++LD2_toggle_counter >= CLOCK_LD_TOGGLE) {
             LD2_toggle_counter = 0;
             LATGbits.LATG9 = !LATGbits.LATG9;
@@ -133,12 +135,23 @@ int main(void) {
 
             //TODO: print only at specified Hz
             sprintf(output_str, "$MAG,%d,%d,%d*", avg_reading.x, avg_reading.y, avg_reading.z);
-            print_to_buff(output_str);
+            // print_to_buff(output_str);
 
             const int yaw_deg = (int) (180.0 * atan2((float)avg_reading.y, (float)avg_reading.x) / M_PI);
             sprintf(output_str, "$YAW,%d*", yaw_deg); 
-            print_to_buff(output_str);
+            // print_to_buff(output_str);
         }
+
+        while(UART_input_buff.read != UART_input_buff.write) {
+            const int status = parse_byte(&pstate, UART_input_buff.buff[UART_input_buff.read]);
+            if (status == NEW_MESSAGE) {
+                const int freq = extract_integer(pstate.msg_payload);
+                sprintf(output_str, "$FREQ,%d*", freq); 
+                print_to_buff(output_str);
+            }
+            UART_input_buff.read = (UART_input_buff.read + 1) % INPUT_BUFF_LEN;
+        }
+
         tmr_wait_period(TIMER1);
     }
     return 0;
@@ -153,6 +166,20 @@ void __attribute__((__interrupt__)) _U1TXInterrupt(void){
     while(!U1STAbits.UTXBF && UART_output_buff.read != UART_output_buff.write){
         U1TXREG = UART_output_buff.buff[UART_output_buff.read];
         UART_output_buff.read = (UART_output_buff.read + 1) % OUTPUT_BUFF_LEN;
+    }
+}
+
+void __attribute__((__interrupt__)) _U1RXInterrupt(void) {
+    IFS0bits.U1RXIF = 0; //resetting the interrupt flag to 0
+ 
+    while(U1STAbits.URXDA) {
+        const char read_char = U1RXREG;
+
+        const int new_write_index = (UART_input_buff.write + 1) % INPUT_BUFF_LEN;
+        if (new_write_index != UART_input_buff.read) {
+            UART_input_buff.buff[UART_input_buff.write] = read_char;
+            UART_input_buff.write = new_write_index;
+        }
     }
 }
 

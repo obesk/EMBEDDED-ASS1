@@ -7,6 +7,7 @@
       <itemPath>spi.h</itemPath>
       <itemPath>uart.h</itemPath>
       <itemPath>timer.h</itemPath>
+      <itemPath>parser.h</itemPath>
     </logicalFolder>
     <logicalFolder name="ExternalFiles"
                    displayName="Important Files"
@@ -24,6 +25,7 @@
       <itemPath>uart.c</itemPath>
       <itemPath>main.c</itemPath>
       <itemPath>timer.c</itemPath>
+      <itemPath>parser.c</itemPath>
     </logicalFolder>
   </logicalFolder>
   <projectmakefile>Makefile</projectmakefile>

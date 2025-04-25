@@ -65,6 +65,6 @@ int extract_integer(const char* str) {
 int next_value(const char* msg, int i) {
 	while (msg[i] != ',' && msg[i] != '\0') { i++; }
 	if (msg[i] == ',')
-		i++
+		i++;
 	return i;
 }
