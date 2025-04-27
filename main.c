@@ -41,6 +41,19 @@ void algorithm() {
     tmr_wait_ms(TIMER2, 7);
 }
 
+int current_rate = 5; // default value of 5 Hz
+const int valid_rates_values[] = {0, 1, 2, 4, 5, 10};
+const int valid_rates_num = sizeof(valid_rates_values)/sizeof(valid_rates_values[0]);
+
+int is_valid_rate(int rate) {
+    for(int i = 0; i < valid_rates_num; i++){
+        if(valid_rates_values[i] == rate){
+            return 1;
+        }
+    }
+    return 0;
+}
+
 void activate_magnetometer() {
     //selecting the magnetometer
     CS_ACC = 1;
@@ -95,7 +108,7 @@ int main(void) {
     int LD2_toggle_counter = 0;
     int acquire_mag_counter = 0;
 
-    tmr_setup_period(TIMER1, 10);
+    tmr_setup_period(TIMER1, 1000 / current_freq);
 
     parser_state pstate = {.state = STATE_DOLLAR };
 
@@ -144,7 +157,26 @@ int main(void) {
 
         while(UART_input_buff.read != UART_input_buff.write) {
             const int status = parse_byte(&pstate, UART_input_buff.buff[UART_input_buff.read]);
-            if (status == NEW_MESSAGE) {
+            if(status == NEW_MESSAGE) {
+                if(strcmp(pstate.msg_type, "RATE") == 0) {
+
+                    int rate = extract_integer(pstate.index_payload);
+
+                    if(is_valid_rate(rate)) {
+                        current_rate = rate;
+                        if(current_rate > 0) {
+                            tmr_setup_period(TIMER1, 1000 / current_rate);
+                        }
+                        // sprintf(output_str, "$RATE,%d*", current_rate);
+                        // print_to_buff(output_buff);
+
+                    } else {
+                        print_to_buff("$ERR,1*");
+                    }
+                }
+
+
+
                 const int freq = extract_integer(pstate.msg_payload);
                 sprintf(output_str, "$FREQ,%d*", freq); 
                 print_to_buff(output_str);
