@@ -5,6 +5,7 @@
  * Created on March 27, 2025, 9:09 PM
  */
 
+// TODO: check that we are sending right data format
 
 #include "timer.h"
 #include "uart.h"
@@ -41,7 +42,6 @@ void algorithm() {
     tmr_wait_ms(TIMER2, 7);
 }
 
-int current_rate = 5; // default value of 5 Hz
 const int valid_rates_values[] = {0, 1, 2, 4, 5, 10};
 const int valid_rates_num = sizeof(valid_rates_values)/sizeof(valid_rates_values[0]);
 
@@ -92,6 +92,8 @@ int main(void) {
     init_uart();
     init_spi(); //TODO: choose the right values for the SPI CLOCK
 
+    int current_rate = 5;
+
     struct MagReadings mag_readings = {0};
 
     char input_buff[INPUT_BUFF_LEN];
@@ -99,7 +101,8 @@ int main(void) {
     UART_input_buff.buff = input_buff;
     UART_output_buff.buff = output_buff;
 
-    TRISA = TRISG = ANSELA = ANSELB = ANSELC = ANSELD = ANSELE = ANSELG = 0x0000;
+    TRISA = TRISG = 0x0000;
+    ANSELA = ANSELB = ANSELC = ANSELD = ANSELE = ANSELG = 0x0000;
 
     activate_magnetometer();
 
@@ -107,8 +110,13 @@ int main(void) {
 
     int LD2_toggle_counter = 0;
     int acquire_mag_counter = 0;
+    int print_mag_counter = 0;
 
-    tmr_setup_period(TIMER1, 1000 / current_freq);
+    const int main_hz = 100;
+    tmr_setup_period(TIMER1, 1000 / main_hz); // TODO: 100 Hz frequency
+
+    struct MagReading avg_reading = {0};
+    int yaw_deg = 0;
 
     parser_state pstate = {.state = STATE_DOLLAR };
 
@@ -119,7 +127,7 @@ int main(void) {
             LATGbits.LATG9 = !LATGbits.LATG9;
         }
 
-        if (++acquire_mag_counter >= CLOCK_LD_TOGGLE) {
+        if (++acquire_mag_counter >= CLOCK_ACQUIRE_MAG) {
             acquire_mag_counter = 0;
 
             // TODO: do some readings at the start to ensure that 
@@ -140,19 +148,19 @@ int main(void) {
                 sum_reading.z += mag_readings.readings[i].z;
             }
 
-            const struct MagReading avg_reading = {
-                .x = sum_reading.x / N_MAG_READINGS,
-                .y = sum_reading.y / N_MAG_READINGS,
-                .z = sum_reading.z / N_MAG_READINGS,
-            };
+            avg_reading.x = sum_reading.x / N_MAG_READINGS,
+            avg_reading.y = sum_reading.y / N_MAG_READINGS,
+            avg_reading.z = sum_reading.z / N_MAG_READINGS,
 
-            //TODO: print only at specified Hz
+            yaw_deg = (int) (180.0 * atan2((float)avg_reading.y, (float)avg_reading.x) / M_PI);
+        }
+
+        if (current_rate && ++print_mag_counter >= (main_hz / current_rate)) {
+            print_mag_counter = 0;
             sprintf(output_str, "$MAG,%d,%d,%d*", avg_reading.x, avg_reading.y, avg_reading.z);
-            // print_to_buff(output_str);
-
-            const int yaw_deg = (int) (180.0 * atan2((float)avg_reading.y, (float)avg_reading.x) / M_PI);
+            print_to_buff(output_str);
             sprintf(output_str, "$YAW,%d*", yaw_deg); 
-            // print_to_buff(output_str);
+            print_to_buff(output_str);
         }
 
         while(UART_input_buff.read != UART_input_buff.write) {
@@ -174,9 +182,6 @@ int main(void) {
                         print_to_buff("$ERR,1*");
                     }
                 }
-
-
-
                 const int freq = extract_integer(pstate.msg_payload);
                 sprintf(output_str, "$FREQ,%d*", freq); 
                 print_to_buff(output_str);
