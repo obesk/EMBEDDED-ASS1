@@ -1,11 +1,7 @@
 #include "uart.h"
 #include <xc.h>
 
-
-struct circular_buffer UART_input_buff = {0};
-struct circular_buffer UART_output_buff = {0};
-
-int int_ret = 1; 
+int UART_INTERRUPT_TX_MANUAL_TRIG = 1; 
 
 void init_uart() {
     RPINR18bits.U1RXR = 0b1001011; // mapping pin RD11(RPI75) to UART RX
@@ -26,24 +22,26 @@ void init_uart() {
 
 }
 
-//TODO: make function more gneral with buff as input
-void print_to_buff(const char * str) {
+void print_to_buff(const char * str, struct circular_buffer *buff) {
     if(!str) {
         return; 
     }
     
     for (int i = 0; str[i] != '\0'; ++i) {
-        const int new_write_index = (UART_output_buff.write + 1) % OUTPUT_BUFF_LEN;
+        const int new_write_index = (buff->write + 1) % buff->len;
 
-        if(new_write_index == UART_output_buff.read) {
+        if(new_write_index == buff->read) {
             break;
         }
 
-        UART_output_buff.buff[UART_output_buff.write] = str[i];
-        UART_output_buff.write = new_write_index;
+        buff->buff[buff->write] = str[i];
+        buff->write = new_write_index;
     }
 
-    if(int_ret){
+    // if the last UART transfer didn't send any data we retrigger the interrupt
+    // manually to send the new data
+    if(UART_INTERRUPT_TX_MANUAL_TRIG){
+        UART_INTERRUPT_TX_MANUAL_TRIG = 0;
         IFS0bits.U1TXIF = 1;
     }
 }

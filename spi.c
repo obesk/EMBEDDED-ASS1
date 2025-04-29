@@ -1,4 +1,5 @@
 #include "spi.h"
+
 #include <xc.h>
 
 unsigned int spi_write(unsigned int data) {
@@ -12,7 +13,6 @@ unsigned int spi_write(unsigned int data) {
 }
 
 void init_spi() {
-
     ANSELA = ANSELB = ANSELC = ANSELD = ANSELE = ANSELG = 0x0000;
 
     SPI1CON1bits.MSTEN = 1; // master mode 

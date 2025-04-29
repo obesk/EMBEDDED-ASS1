@@ -7,6 +7,33 @@
 #include <string.h>
 #include <math.h>
 
+// Since we use a 10 bit UART transmission we use 10 bits for a byte of data. 
+// With a 100Hz main we have 9,6 bytes per cycle
+#define INPUT_BUFF_LEN 10
+
+// considerations on MAG message:
+// for the x and y axis we have 2^13 bytes signed, which is equivalent to range:
+// 4095 : -4096  -> 5 bytes max
+// for the z axis we have 2^15 bytes signed, which is equivalent to range:
+// 16383 : -16384 -> 6 bytes max
+
+// considreations on YAW message:
+// the yaw is in degrees so we have a range of 180 : -180 -> 4 bytes
+
+// considerations on ERR from rate message:
+// with 10 bytes we can have a max of 2 RATE messages received
+// each ERR message is 7 bytes so 14 bytes max
+
+// considering the worst can in which we print all messages together:
+// - $MAG,,,* -> 8 bytes
+// - x, y axis -> 10 bytes max
+// - z axis -> 6 bytes max
+// - $YAW,* -> 6 bytes
+// - angle -> 4 bytes
+// - err message -> 14 bytes
+// total: 48 bytes
+#define OUTPUT_BUFF_LEN 48
+
 // this define the frequency of the tasks based on the frequency of the main.
 #define CLOCK_LD_TOGGLE 50 // led2 blinking at 1Hz
 #define CLOCK_ACQUIRE_MAG 4 // acquiring magnetometer values at 25Hz
@@ -15,6 +42,19 @@
 #define N_MAG_READINGS 5 // number of mag values to keep for the average
 
 #define VALID_RATES_N 6
+
+char input_buff[INPUT_BUFF_LEN];
+char output_buff[OUTPUT_BUFF_LEN];
+
+struct circular_buffer UART_input_buff = {
+    .len = INPUT_BUFF_LEN,
+    .buff = input_buff,
+};
+
+struct circular_buffer UART_output_buff = {
+    .len = OUTPUT_BUFF_LEN,
+    .buff = output_buff,
+};
 
 // to avoid overflow with sums it's better to use long
 struct MagReading {
@@ -104,8 +144,6 @@ int main(void) {
 
     struct MagReadings mag_readings = {0};
 
-    char input_buff[INPUT_BUFF_LEN];
-    char output_buff[OUTPUT_BUFF_LEN];
     UART_input_buff.buff = input_buff;
     UART_output_buff.buff = output_buff;
 
@@ -177,14 +215,14 @@ int main(void) {
 
         if (print_mag_rate && ++print_mag_counter >= (main_hz / print_mag_rate)) {
             print_mag_counter = 0;
-            sprintf(output_str, "$MAG,%d,%d,%d*", avg_reading.x, avg_reading.y, avg_reading.z);
-            print_to_buff(output_str);
+            sprintf(output_str, "$MAG,%d,%d,%d*", (int)avg_reading.x, (int)avg_reading.y, (int)avg_reading.z);
+            print_to_buff(output_str, &UART_output_buff);
         }
 
         if (++print_yaw_counter >= CLOCK_YAW_PRINT) {
             print_yaw_counter = 0;
             sprintf(output_str, "$YAW,%d*", yaw_deg); 
-            print_to_buff(output_str);
+            print_to_buff(output_str, &UART_output_buff);
         }
 
         while(UART_input_buff.read != UART_input_buff.write) {
@@ -195,7 +233,7 @@ int main(void) {
                     if(is_valid_rate(rate)) {
                         print_mag_rate = rate;
                     } else {
-                        print_to_buff("$ERR,1*");
+                        print_to_buff("$ERR,1*", &UART_output_buff);
                     }
                 }
             }
@@ -208,9 +246,11 @@ int main(void) {
 
 void __attribute__((__interrupt__)) _U1TXInterrupt(void){
     IFS0bits.U1TXIF = 0; // clear TX interrupt flag
+
+
     if(UART_output_buff.read == UART_output_buff.write){
-        int_ret = 1;
-    }
+        UART_INTERRUPT_TX_MANUAL_TRIG = 1;
+    } 
 
     while(!U1STAbits.UTXBF && UART_output_buff.read != UART_output_buff.write){
         U1TXREG = UART_output_buff.buff[UART_output_buff.read];
