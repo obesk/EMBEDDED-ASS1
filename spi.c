@@ -18,8 +18,11 @@ void init_spi() {
 
     SPI1CON1bits.MSTEN = 1; // master mode 
     SPI1CON1bits.MODE16 = 0; // 8-bit mode 
+ 
+    // since for the SPI we wait actively for the readings, we set the maximum 
+    // frequency possible 
     SPI1CON1bits.PPRE = 3; // 1:1 primary prescaler
-    SPI1CON1bits.SPRE = 3; // 5:1 secondary prescaler
+    SPI1CON1bits.SPRE = 6; // 2:1 secondary prescaler
     
     TRISAbits.TRISA1 = 1; // RA1-RPI17 MISO
     TRISFbits.TRISF12 = 0; // RF12-RP108 SCK

@@ -5,8 +5,6 @@
  * Created on March 27, 2025, 9:09 PM
  */
 
-// TODO: check that we are sending right data format
-
 #include "timer.h"
 #include "uart.h"
 #include "spi.h"
@@ -76,9 +74,9 @@ void activate_magnetometer() {
 }
 
 int read_mag_axis(enum Axis axis) {
-    //TODO: decide what to do with this overflow
-    if(SPI1STATbits.SPIROV){
+    if(SPI1STATbits.SPIROV){ // this should never happen, turning on LED to signal a bug
         SPI1STATbits.SPIROV = 0;
+        LATA = 1;
     }
     
     CS_MAG = 0;
@@ -91,9 +89,9 @@ int read_mag_axis(enum Axis axis) {
 
 int main(void) {
     init_uart();
-    init_spi(); //TODO: choose the right values for the SPI CLOCK
+    init_spi();
 
-    int current_rate = 5;
+    int print_mag_rate = 5;
 
     struct MagReadings mag_readings = {0};
 
@@ -107,7 +105,8 @@ int main(void) {
 
     activate_magnetometer();
 
-    char output_str [50]; //TODO: size correctly
+    // our largerst string is 20 bytes, this should be changed in case of differnt print messages
+    char output_str [20]; 
 
     int LD2_toggle_counter = 0;
     int acquire_mag_counter = 0;
@@ -115,7 +114,7 @@ int main(void) {
     int print_yaw_counter = 0;
 
     const int main_hz = 100;
-    tmr_setup_period(TIMER1, 1000 / main_hz); // TODO: 100 Hz frequency
+    tmr_setup_period(TIMER1, 1000 / main_hz); // 100 Hz frequency
 
     struct MagReading avg_reading = {0};
     int yaw_deg = 0;
@@ -157,7 +156,7 @@ int main(void) {
             yaw_deg = (int) (180.0 * atan2((float)avg_reading.y, (float)avg_reading.x) / M_PI);
         }
 
-        if (current_rate && ++print_mag_counter >= (main_hz / current_rate)) {
+        if (print_mag_rate && ++print_mag_counter >= (main_hz / print_mag_rate)) {
             print_mag_counter = 0;
             sprintf(output_str, "$MAG,%d,%d,%d*", avg_reading.x, avg_reading.y, avg_reading.z);
             print_to_buff(output_str);
@@ -179,7 +178,7 @@ int main(void) {
                     print_to_buff(output_str);
 
                     if(is_valid_rate(rate)) {
-                        current_rate = rate;
+                        print_mag_rate = rate;
                     } else {
                         print_to_buff("$ERR,1*");
                     }

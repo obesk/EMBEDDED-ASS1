@@ -12,9 +12,6 @@
 #define FCY 72000000
 #define MAX_UINT16 65535
 
-// TODO: here I implemented an adaptable prescaler, we should ask prof Simetti
-// if this is a good approach
-
 void tmr_setup_period(int timer, int ms) {
 	if (ms <= 0) {
 		return;
@@ -30,8 +27,6 @@ void tmr_setup_period(int timer, int ms) {
 	while (p > prescalers[i]) {
 		++i;
 	}
-	// TODO: here we could return an error value if the ms passed exceed the
-	// value of the prescaler
 	const int p_type = i;
 
 	const int clocks = (int)(s * (float)FCY / (float)(prescalers[p_type]));
