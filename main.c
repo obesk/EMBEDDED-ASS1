@@ -1,3 +1,4 @@
+//TODO: change project name
 /*
  * File:   main.c
  * Author: obe
@@ -73,6 +74,7 @@ void activate_magnetometer() {
     tmr_wait_ms(TIMER1, 3); //waiting for the magnetometer to go into active state
 }
 
+// FIXME: read the z axis correctly
 int read_mag_axis(enum Axis axis) {
     if(SPI1STATbits.SPIROV){ // this should never happen, turning on LED to signal a bug
         SPI1STATbits.SPIROV = 0;
@@ -113,13 +115,26 @@ int main(void) {
     int print_mag_counter = 0;
     int print_yaw_counter = 0;
 
-    const int main_hz = 100;
-    tmr_setup_period(TIMER1, 1000 / main_hz); // 100 Hz frequency
 
     struct MagReading avg_reading = {0};
     int yaw_deg = 0;
 
     parser_state pstate = {.state = STATE_DOLLAR };
+
+    // filling the array of magnetormeter readings to ensure that the first 
+    // average value computed is right
+    tmr_setup_period(TIMER1, 40); // setting the same period as in the main
+    for (int i = 0; i < N_MAG_READINGS; ++i) {
+        mag_readings.readings[i] = (struct MagReading) {
+            .x = read_mag_axis(X_AXIS),
+            .y = read_mag_axis(Y_AXIS),
+            .z = read_mag_axis(Z_AXIS),
+        };
+        tmr_wait_period(TIMER1);
+    }
+
+    const int main_hz = 100;
+    tmr_setup_period(TIMER1, 1000 / main_hz); // 100 Hz frequency
 
     while (1) {
         algorithm();
@@ -131,8 +146,6 @@ int main(void) {
         if (++acquire_mag_counter >= CLOCK_ACQUIRE_MAG) {
             acquire_mag_counter = 0;
 
-            // TODO: do some readings at the start to ensure that 
-            // the average is decent
             mag_readings.readings[mag_readings.w] = (struct MagReading) {
                 .x = read_mag_axis(X_AXIS),
                 .y = read_mag_axis(Y_AXIS),
@@ -141,7 +154,6 @@ int main(void) {
 
             mag_readings.w = (mag_readings.w + 1) % N_MAG_READINGS;
 
-            //TODO: ensure that no overflow can occur
             struct MagReading sum_reading = {0}; 
             for(int i = mag_readings.w ; i != (mag_readings.w + 1) % N_MAG_READINGS; i = (i + 1) % N_MAG_READINGS) {
                 sum_reading.x += mag_readings.readings[i].x;
@@ -172,11 +184,7 @@ int main(void) {
             const int status = parse_byte(&pstate, UART_input_buff.buff[UART_input_buff.read]);
             if(status == NEW_MESSAGE) {
                 if(strcmp(pstate.msg_type, "RATE") == 0) {
-
                     const int rate = extract_integer(pstate.msg_payload);
-                    sprintf(output_str, "$FREQ,%d*", rate);  //TODO: remove after debug
-                    print_to_buff(output_str);
-
                     if(is_valid_rate(rate)) {
                         print_mag_rate = rate;
                     } else {
@@ -186,7 +194,6 @@ int main(void) {
             }
             UART_input_buff.read = (UART_input_buff.read + 1) % INPUT_BUFF_LEN;
         }
-
         tmr_wait_period(TIMER1);
     }
     return 0;

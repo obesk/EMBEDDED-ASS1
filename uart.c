@@ -33,7 +33,7 @@ void print_to_buff(const char * str) {
     }
     
     for (int i = 0; str[i] != '\0'; ++i) {
-        const int new_write_index = (UART_output_buff.write + 1) % INPUT_BUFF_LEN;
+        const int new_write_index = (UART_output_buff.write + 1) % OUTPUT_BUFF_LEN;
 
         if(new_write_index == UART_output_buff.read) {
             break;
