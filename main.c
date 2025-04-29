@@ -5,6 +5,7 @@
 
 #include <xc.h>
 #include <string.h>
+#include <stdio.h>
 #include <math.h>
 
 // Since we use a 10 bit UART transmission we use 10 bits for a byte of data. 
@@ -244,7 +245,7 @@ int main(void) {
     return 0;
 }
 
-void __attribute__((__interrupt__)) _U1TXInterrupt(void){
+void __attribute__((__interrupt__, no_auto_psv)) _U1TXInterrupt(void){
     IFS0bits.U1TXIF = 0; // clear TX interrupt flag
 
 
@@ -258,7 +259,7 @@ void __attribute__((__interrupt__)) _U1TXInterrupt(void){
     }
 }
 
-void __attribute__((__interrupt__)) _U1RXInterrupt(void) {
+void __attribute__((__interrupt__, no_auto_psv)) _U1RXInterrupt(void) {
     IFS0bits.U1RXIF = 0; //resetting the interrupt flag to 0
 
     while(U1STAbits.URXDA) {
