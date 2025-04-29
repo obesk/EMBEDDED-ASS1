@@ -1,10 +1,3 @@
-/*
- * File:   timer.c
- * Author: obe
- *
- * Created on March 3, 2025, 11:03 AM
- */
-
 #include "timer.h"
 #include <xc.h>
 #define MAX_DELAY 200

@@ -1,10 +1,3 @@
-/*
- * File:   main.c
- * Author: obe
- *
- * Created on March 27, 2025, 9:09 PM
- */
-
 #include "timer.h"
 #include "uart.h"
 #include "spi.h"
@@ -14,16 +7,20 @@
 #include <string.h>
 #include <math.h>
 
-#define CLOCK_LD_TOGGLE 50
-#define CLOCK_ACQUIRE_MAG 4
-#define CLOCK_YAW_PRINT 20
+// this define the frequency of the tasks based on the frequency of the main.
+#define CLOCK_LD_TOGGLE 50 // led2 blinking at 1Hz
+#define CLOCK_ACQUIRE_MAG 4 // acquiring magnetometer values at 25Hz
+#define CLOCK_YAW_PRINT 20 // printing yaw at 5Hz
 
-#define N_MAG_READINGS 5
+#define N_MAG_READINGS 5 // number of mag values to keep for the average
 
+#define VALID_RATES_N 6
+
+// to avoid overflow with sums it's better to use long
 struct MagReading {
-    int x;
-    int y;
-    int z;
+    long x;
+    long y;
+    long z;
 };
 
 struct MagReadings {
@@ -42,10 +39,9 @@ void algorithm() {
 }
 
 const int valid_rates_values[] = {0, 1, 2, 4, 5, 10};
-const int valid_rates_num = 6;
 
 int is_valid_rate(int rate) {
-    for(int i = 0; i < valid_rates_num; i++){
+    for(int i = 0; i < VALID_RATES_N; i++){
         if(valid_rates_values[i] == rate){
             return 1;
         }
@@ -54,7 +50,7 @@ int is_valid_rate(int rate) {
 }
 
 void activate_magnetometer() {
-    //selecting the magnetometer
+    //selecting the magnetometer and disabling accelerometer and gyroscope
     CS_ACC = 1;
     CS_GYR = 1;
     
@@ -76,17 +72,22 @@ void activate_magnetometer() {
 int read_mag_axis(enum Axis axis) {
     int axis_value;
 
+    // the overflow should not happen by design. If it happens the LED1 is turned
+    // on to signal a bug in the code
     if(SPI1STATbits.SPIROV){
         SPI1STATbits.SPIROV = 0;
         LATA = 1;
     }
     CS_MAG = 0;
+    // the axis registers are sequential
     spi_write((0x42 + axis * 2)| 0x80); //writing the axis register to read
 
     if (axis == X_AXIS || axis == Y_AXIS){
+        // converting to int and shifting the values
         const int bytes_value = (spi_write(0x00) & 0x00F8) | (spi_write(0x00) << 8);
         axis_value = bytes_value >> 3;
     } else {
+        // converting to int and shifting the values
         const int bytes_value = (spi_write(0x00) & 0x00FE) | (spi_write(0x00) << 8);
         axis_value = bytes_value >> 1;
     }
@@ -108,8 +109,8 @@ int main(void) {
     UART_input_buff.buff = input_buff;
     UART_output_buff.buff = output_buff;
 
-    TRISA = TRISG = 0x0000;
-    ANSELA = ANSELB = ANSELC = ANSELD = ANSELE = ANSELG = 0x0000;
+    TRISA = TRISG = 0x0000; // setting port A and G as output
+    ANSELA = ANSELB = ANSELC = ANSELD = ANSELE = ANSELG = 0x0000; // disabling analog function
 
     activate_magnetometer();
 
@@ -219,7 +220,7 @@ void __attribute__((__interrupt__)) _U1TXInterrupt(void){
 
 void __attribute__((__interrupt__)) _U1RXInterrupt(void) {
     IFS0bits.U1RXIF = 0; //resetting the interrupt flag to 0
- 
+
     while(U1STAbits.URXDA) {
         const char read_char = U1RXREG;
 
@@ -230,4 +231,3 @@ void __attribute__((__interrupt__)) _U1RXInterrupt(void) {
         }
     }
 }
-

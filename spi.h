@@ -1,10 +1,3 @@
-/* 
- * File:   spi.h
- * Author: mattia
- *
- * Created on April 4, 2025, 3:46 PM
- */
-
 #ifndef SPI_H
 #define	SPI_H
 

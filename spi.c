@@ -2,7 +2,6 @@
 #include <xc.h>
 
 unsigned int spi_write(unsigned int data) {
-    
     while (SPI1STATbits.SPITBF == 1);
 
     SPI1BUF = data;

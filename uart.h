@@ -1,10 +1,3 @@
-/* 
- * File:   uart.h
- * Author: mattia
- *
- * Created on April 4, 2025, 2:42 PM
- */
-
 #ifndef UART_H
 #define	UART_H
 
@@ -53,5 +46,3 @@ void init_uart();
 void print_to_buff(const char * str);
 
 #endif	/* UART_H */
-
-
