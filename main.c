@@ -76,17 +76,25 @@ void activate_magnetometer() {
 }
 
 int read_mag_axis(enum Axis axis) {
-    //TODO: decide what to do with this overflow
+
+    int axis_value;
+
     if(SPI1STATbits.SPIROV){
         SPI1STATbits.SPIROV = 0;
     }
-    
-    CS_MAG = 0;
-    spi_write((0x42 + axis * 2)| 0x80);
-    const int axis_value = (spi_write(0x00) & 0x00F8) | (spi_write(0x00) << 8);
-    CS_MAG = 1;
-
-    return axis_value >> 3;
+    if (axis == X_AXIS || axis == Y_AXIS){
+        CS_MAG = 0;
+        spi_write((0x42 + axis * 2)| 0x80);
+        axis_value = (spi_write(0x00) & 0x00F8) | (spi_write(0x00) << 8);
+        CS_MAG = 1;
+        return axis_value >> 3;
+    } else {
+        CS_MAG = 0;
+        spi_write((0x47)| 0x80);
+        axis_value = (spi_write(0x00) & 0x00FE) | (spi_write(0x00) << 8);
+        CS_MAG = 1;
+        return axis_value >> 1;
+    }
 }
 
 int main(void) {
