@@ -18,6 +18,7 @@
 
 #define CLOCK_LD_TOGGLE 50
 #define CLOCK_ACQUIRE_MAG 4
+#define CLOCK_YAW_PRINT 20
 
 #define N_MAG_READINGS 5
 
@@ -43,7 +44,7 @@ void algorithm() {
 }
 
 const int valid_rates_values[] = {0, 1, 2, 4, 5, 10};
-const int valid_rates_num = sizeof(valid_rates_values)/sizeof(valid_rates_values[0]);
+const int valid_rates_num = 6;
 
 int is_valid_rate(int rate) {
     for(int i = 0; i < valid_rates_num; i++){
@@ -111,6 +112,7 @@ int main(void) {
     int LD2_toggle_counter = 0;
     int acquire_mag_counter = 0;
     int print_mag_counter = 0;
+    int print_yaw_counter = 0;
 
     const int main_hz = 100;
     tmr_setup_period(TIMER1, 1000 / main_hz); // TODO: 100 Hz frequency
@@ -159,6 +161,10 @@ int main(void) {
             print_mag_counter = 0;
             sprintf(output_str, "$MAG,%d,%d,%d*", avg_reading.x, avg_reading.y, avg_reading.z);
             print_to_buff(output_str);
+        }
+
+        if (++print_yaw_counter >= CLOCK_YAW_PRINT) {
+            print_yaw_counter = 0;
             sprintf(output_str, "$YAW,%d*", yaw_deg); 
             print_to_buff(output_str);
         }
@@ -168,23 +174,16 @@ int main(void) {
             if(status == NEW_MESSAGE) {
                 if(strcmp(pstate.msg_type, "RATE") == 0) {
 
-                    int rate = extract_integer(pstate.index_payload);
+                    const int rate = extract_integer(pstate.msg_payload);
+                    sprintf(output_str, "$FREQ,%d*", rate);  //TODO: remove after debug
+                    print_to_buff(output_str);
 
                     if(is_valid_rate(rate)) {
                         current_rate = rate;
-                        if(current_rate > 0) {
-                            tmr_setup_period(TIMER1, 1000 / current_rate);
-                        }
-                        // sprintf(output_str, "$RATE,%d*", current_rate);
-                        // print_to_buff(output_buff);
-
                     } else {
                         print_to_buff("$ERR,1*");
                     }
                 }
-                const int freq = extract_integer(pstate.msg_payload);
-                sprintf(output_str, "$FREQ,%d*", freq); 
-                print_to_buff(output_str);
             }
             UART_input_buff.read = (UART_input_buff.read + 1) % INPUT_BUFF_LEN;
         }
@@ -220,17 +219,3 @@ void __attribute__((__interrupt__)) _U1RXInterrupt(void) {
     }
 }
 
-       // if(SPI1STATbits.SPIROV){
-        //     SPI1STATbits.SPIROV = 0;
-        //     sprintf(output_buff, "SPIROV");
-        //     print_to_uart(output_buff);
-        // } else {
-        //     CS_MAG = 0;
-        //     spi_write(0x42 | 0x80);
-        //     unsigned int mag_x_axis = (spi_write(0x00) & 0x00F8) | (spi_write(0x00) << 8);
-        //     CS_MAG = 1;
-
-        //     sprintf(output_buff, "$MAGX=%d*", mag_x_axis);
-        //     print_to_uart(output_buff);
-        //     tmr_wait_ms(TIMER1, 100);
-        // }
