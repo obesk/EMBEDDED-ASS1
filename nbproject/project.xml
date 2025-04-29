@@ -3,7 +3,7 @@
     <type>com.microchip.mplab.nbide.embedded.makeproject</type>
     <configuration>
         <data xmlns="http://www.netbeans.org/ns/make-project/1">
-            <name>ASS1</name>
+            <name>EMBEDD_ASS1_GR5</name>
             <creation-uuid>cfcf6cab-4b59-4f49-bca8-e1593813de28</creation-uuid>
             <make-project-type>0</make-project-type>
             <sourceEncoding>ISO-8859-1</sourceEncoding>

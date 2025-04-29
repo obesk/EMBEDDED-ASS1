@@ -1,4 +1,3 @@
-//TODO: change project name
 /*
  * File:   main.c
  * Author: obe
